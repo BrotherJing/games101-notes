@@ -1,0 +1,72 @@
+### Renderer.cpp
+
+遍历每个像素生成光线。给的代码似乎有问题，需要把`uint32_t`改成`int`。直接用hw5的即可。
+```cpp
+// Renderer::Render
+y = (scene.height/2 - j) * 2.0 / scene.height * scale;
+x = (i - scene.width/2) * 2.0 / scene.width * scale * imageAspectRatio;
+Vector3f dir = Vector3f(x, y, -1);
+dir = normalize(dir);
+framebuffer[m++] = scene.castRay(Ray(eye_pos, dir), 0);
+```
+
+### Triangle.hpp
+
+实现三角形和光线相交算法。还是Möller Trumbore Algorithm公式，只是部分已经提供了，还换了变量名。
+
+```cpp
+// Triangle::getIntersection
+if (t_tmp >= 0) {
+    inter.happened = true;
+    inter.coords = Vector3f(ray.origin + t_tmp * ray.direction);
+    inter.normal = normal;
+    inter.m = m;
+    inter.distance = t_tmp;
+    inter.obj = this;
+}
+```
+
+### Bounds3.hpp
+
+实现AABB和光线相交算法。套公式即可。需要注意需要用光线方向判断用pMin还是pMax，这个课上好像没说。
+
+```cpp
+// Bounds3::IntersectP
+double t_min_x = (pMin.x * dirIsNeg[0] + pMax.x * (1- dirIsNeg[0]) - ray.origin.x) * invDir.x;
+double t_max_x = (pMax.x * dirIsNeg[0] + pMin.x * (1- dirIsNeg[0]) - ray.origin.x) * invDir.x;
+double t_min_y = (pMin.y * dirIsNeg[1] + pMax.y * (1- dirIsNeg[1]) - ray.origin.y) * invDir.y;
+double t_max_y = (pMax.y * dirIsNeg[1] + pMin.y * (1- dirIsNeg[1]) - ray.origin.y) * invDir.y;
+double t_min_z = (pMin.z * dirIsNeg[2] + pMax.z * (1- dirIsNeg[2]) - ray.origin.z) * invDir.z;
+double t_max_z = (pMax.z * dirIsNeg[2] + pMin.z * (1- dirIsNeg[2]) - ray.origin.z) * invDir.z;
+double t_enter = fmax(t_min_x, fmax(t_min_y, t_min_z));
+double t_exit = fmin(t_max_x, fmin(t_max_y, t_max_z));
+return t_enter < t_exit && t_exit >= 0;
+```
+
+### BVH.cpp
+
+实现递归求交。直接参考伪代码写。
+
+```cpp
+// BVHAccel::getIntersection
+Intersection isect;
+std::array<int, 3> dirIsNeg = {int(ray.direction.x>0), int(ray.direction.y>0), int(ray.direction.z>0};
+if (!node->bounds.IntersectP(ray, ray.direction_inv, dirIsNeg)) {
+    return isect;
+}
+if (node->object != nullptr) {
+    return node->object->getIntersection(ray);
+}
+Intersection hit1 = BVHAccel::getIntersection(node->left, ray);
+Intersection hit2 = BVHAccel::getIntersection(node->right, ray);
+if (!hit1.happened) {
+    return hit2;
+}
+if (!hit2.happened) {
+    return hit1;
+}
+if (hit1.distance < hit2.distance) {
+    return hit1;
+}
+return hit2;
+```
